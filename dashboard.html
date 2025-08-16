@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard da Fila de Espera - Secretaria de Saúde</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-card: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --accent: #4a6bdf;
+            --accent-hover: #3a5bcf;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-bottom: 2rem;
+        }
+
+        .navbar {
+            background-color: var(--bg-secondary) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--accent) !important;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .metric-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .filter-container {
+            background-color: var(--bg-card);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .table {
+            color: var(--text-primary);
+        }
+
+        .table thead th {
+            background-color: var(--bg-secondary);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .table tbody td {
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-agendado {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+        }
+
+        .status-realizado {
+            background-color: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
+
+        .status-pendente {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning);
+        }
+
+        .status-cancelado {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--danger);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-secondary);
+            margin-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .metric-value {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-hospital me-2"></i>Dashboard da Fila de Espera
+            </span>
+            <span class="navbar-text">
+                Secretaria de Saúde
+            </span>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Filtros -->
+        <div class="filter-container">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label for="monthFilter" class="form-label">Filtrar por Mês:</label>
+                    <select class="form-select" id="monthFilter">
+                        <option value="all" selected>Todos os meses</option>
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <option value="03">Março</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Maio</option>
+                        <option value="06">Junho</option>
+                        <option value="07">Julho</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="procedureFilter" class="form-label">Filtrar por Procedimento:</label>
+                    <select class="form-select" id="procedureFilter">
+                        <option value="all" selected>Todos os procedimentos</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="applyFilters">
+                        <i class="bi bi-funnel me-2"></i>Aplicar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <i class="bi bi-calendar-check metric-icon"></i>
+                        <div class="metric-value" id="totalAgendamentos">95</div>
+                        <div class="metric-label">Total de Agendamentos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <i class="bi bi-clock-history metric-icon"></i>
+                        <div class="metric-value" id="tempoMedioEspera">42</div>
+                        <div class="metric-label">Tempo Médio de Espera (dias)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <i class="bi bi-check-circle metric-icon"></i>
+                        <div class="metric-value" id="procedimentosRealizados">78</div>
+                        <div class="metric-label">Procedimentos Realizados</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <i class="bi bi-x-circle metric-icon"></i>
+                        <div class="metric-value" id="procedimentosCancelados">17</div>
+                        <div class="metric-label">Procedimentos Cancelados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-bar-chart me-2"></i>Contagem de Procedimentos por Tipo
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="proceduresBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-pie-chart me-2"></i>Distribuição por Tipo
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="proceduresPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-graph-up me-2"></i>Evolução Mensal da Fila
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="evolutionLineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Dados -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-table me-2"></i>Detalhamento dos Agendamentos</span>
+                <button class="btn btn-sm btn-outline-light" id="exportBtn">
+                    <i class="bi bi-download me-1"></i>Exportar
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Data da Solicitação</th>
+                                <th>Procedimento</th>
+                                <th>Unidade Solicitante</th>
+                                <th>Data Agendamento</th>
+                                <th>Paciente</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Dados serão inseridos aqui via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2023 Secretaria de Saúde - Todos os direitos reservados</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simulação de dados baseados no arquivo fornecido
+        const data = [
+            {
+                dataSolicitacao: "2019-02-11 15:19:30",
+                dataAgendamento: "2025-05-26 07:55",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "NILTON MARTINS DE OLIVEIRA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 15:22:12",
+                dataAgendamento: "2025-05-20 13:25",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ERANI SCHURE KLIMASCHEWSKI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 15:29:17",
+                dataAgendamento: "2025-05-20 13:00",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "MARLENE ESKELSEN",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 15:40:25",
+                dataAgendamento: "2025-08-11 09:35",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ERON EGON KOPSCH",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 16:03:18",
+                dataAgendamento: "2025-05-27 15:05",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "SIDNEY RODRIGUES",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 16:28:38",
+                dataAgendamento: "2025-05-20 15:05",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "VALDIR MENDONCA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 16:41:57",
+                dataAgendamento: "2025-05-20 14:40",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "MONICA FREIRE METZNER",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 16:51:55",
+                dataAgendamento: "2025-05-20 14:15",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ADEMIR CIPRIANO ESTEVAM JUNIOR",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-11 16:55:23",
+                dataAgendamento: "2025-05-20 15:30",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "EDSON ALCIDES DUARTE",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 09:26:12",
+                dataAgendamento: "2025-05-27 13:50",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ELENIR NUNES NOGUEIRA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 09:56:36",
+                dataAgendamento: "2025-05-20 13:50",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "OSMAR CUBIAK",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:14:48",
+                dataAgendamento: "2025-05-27 13:25",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ANA ROSA CARNEIRO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:15:12",
+                dataAgendamento: "2025-05-27 15:55",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "CELSO ANTONIO BOAVENTURA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:18:19",
+                dataAgendamento: "2025-05-20 15:55",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "LUANA LIMA SIMOES",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:21:44",
+                dataAgendamento: "2025-05-27 13:00",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "SIRLETE WILLINSKY",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:43:03",
+                dataAgendamento: "2025-05-27 15:30",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "MARCIA APARECIDA DE QUADROS PEDROSO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:51:02",
+                dataAgendamento: "2025-05-27 14:40",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "TERESINHA APARECIDA GADOTTI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 10:56:04",
+                dataAgendamento: "2025-05-27 14:15",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "MARLI MACHADO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-02-12 11:00:51",
+                dataAgendamento: "2025-08-15 07:30",
+                procedimento: "ENDOSCOPIA DIGESTIVA ALTA ADULTO",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "ANGELITA DA SILVA",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2019-05-13 10:56:52",
+                dataAgendamento: "2025-05-22 15:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "GRISITA GULARTE",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-13 13:49:28",
+                dataAgendamento: "2025-05-29 10:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ADRIANA JUCELI CATTONI",
+                paciente: "URSULA REICHEL THEILACKER",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-14 13:45:53",
+                dataAgendamento: "2025-05-29 16:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "MIRIAN WESTERKAMP",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-16 12:02:25",
+                dataAgendamento: "2025-05-22 09:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "SINEZIO MELIN",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-16 13:13:09",
+                dataAgendamento: "2025-06-05 11:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "ANTONIO STOLF",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-16 13:25:01",
+                dataAgendamento: "2025-05-29 17:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "ARLEDI MENDONCA DA CUNHA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-16 16:16:07",
+                dataAgendamento: "2025-05-29 17:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "MARLENE DOS SANTOS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-22 08:30:49",
+                dataAgendamento: "2025-05-29 14:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "GUSTAVO HENRIQUE BUZZI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-05-22 11:36:43",
+                dataAgendamento: "2025-05-22 15:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA CAETANO DA SILVA PORTO II",
+                paciente: "ROSITA DE MENDONCA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2019-11-12 17:39:22",
+                dataAgendamento: "2025-08-04 14:15",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "MARLI DE JESUS PIRES",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2020-04-03 11:21:52",
+                dataAgendamento: "2025-08-04 14:30",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS JAQUELINE BONETTI BIANCO",
+                paciente: "LUZIA LEOPOLDO DA SILVA VANELLI",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2020-04-16 11:12:05",
+                dataAgendamento: "2025-05-29 15:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA INDAIA II",
+                paciente: "JOANA CRISTIANA DOS SANTOS SILVEIRA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-06-08 16:23:17",
+                dataAgendamento: "2025-06-09 16:00",
+                procedimento: "CONSULTA EM PSICOLOGIA",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "ELZA MARIA MARTINS CENSI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-09-10 15:15:30",
+                dataAgendamento: "2025-07-02 08:20",
+                procedimento: "CONSULTA EM PROCTOLOGIA - GERAL",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "CRISTIANE CASATTI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-09-30 16:16:15",
+                dataAgendamento: "2025-07-09 08:00",
+                procedimento: "CONSULTA EM PROCTOLOGIA - GERAL",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "CAMILA DA SILVA NOACK",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-10-22 09:03:31",
+                dataAgendamento: "2025-08-04 14:45",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA ARTUR KEUNECKE II",
+                paciente: "BRENDA EMELISA MIGUEL DE ARAUJO",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2020-11-26 10:04:03",
+                dataAgendamento: "2025-06-05 11:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ADRIANA JUCELI CATTONI",
+                paciente: "PATRICIA WESTPHAL",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-12-03 09:22:11",
+                dataAgendamento: "2025-07-09 08:10",
+                procedimento: "CONSULTA EM PROCTOLOGIA - GERAL",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "FABIO JOAQUIM HARDT",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-12-09 13:38:59",
+                dataAgendamento: "2025-08-26 08:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA REMO WENDORF II",
+                paciente: "SILVIA KOHNS",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2020-12-09 14:03:03",
+                dataAgendamento: "2025-06-06 09:30",
+                procedimento: "CONSULTA EM PEDIATRIA",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "HELENA FEIFERBERG",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2020-12-11 16:40:16",
+                dataAgendamento: "2025-08-26 09:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA REMO WENDORF II",
+                paciente: "CELIMAR ALVES DE OLIVEIRA",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2020-12-15 15:41:28",
+                dataAgendamento: "2025-08-04 15:00",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA REMO WENDORF II",
+                paciente: "ARLETE GERTRUDES VARGAS",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-01-11 09:56:10",
+                dataAgendamento: "2025-08-05 11:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS MARCIA MARIA ANDREATTA",
+                paciente: "ALFREDO DA LUZ",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-02 09:15:40",
+                dataAgendamento: "2025-08-26 09:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "ILTO SAMULEWSKI",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-05 08:52:52",
+                dataAgendamento: "2025-08-26 11:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS ADRIANA JUCELI CATTONI",
+                paciente: "MARLENE RODRIGUES DOS SANTOS",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-05 16:30:29",
+                dataAgendamento: "2025-08-26 11:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "IVONETE ANTON",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-08 10:40:38",
+                dataAgendamento: "2025-08-26 12:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "JANICE MARCHEZE LUCIANI",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-16 16:33:29",
+                dataAgendamento: "2025-08-26 14:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS CAETANO DA SILVA PORTO",
+                paciente: "ISABEL DE OLIVEIRA FREIBERGER",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-02-24 11:01:16",
+                dataAgendamento: "2025-08-26 18:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "MARLI TERESINHA SCHULZ",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-04 10:28:01",
+                dataAgendamento: "2025-08-26 17:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "MARLENE WOLF BRAMBILI",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-04 14:26:14",
+                dataAgendamento: "2025-08-26 16:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS JAQUELINE BONETTI BIANCO",
+                paciente: "CECILIA SIMAO",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-08 14:40:33",
+                dataAgendamento: "2025-08-26 15:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA NILO DE FREITAS II",
+                paciente: "DORLITA METZNER",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-08 14:42:24",
+                dataAgendamento: "2025-08-26 15:30",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA NILO DE FREITAS II",
+                paciente: "NATAL DOS SANTOS",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-08 15:35:20",
+                dataAgendamento: "2025-08-04 15:15",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA NILO DE FREITAS II",
+                paciente: "ESPERTINA MARLI DE ANDRADE",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-03-11 08:50:38",
+                dataAgendamento: "2025-07-04 08:40",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "AMBROSINA TRAEBERT",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-05-17 11:51:48",
+                dataAgendamento: "2025-08-15 09:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ALBERT SABIN",
+                paciente: "MAURINA POLLI",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-05-21 13:42:59",
+                dataAgendamento: "2025-05-22 10:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "RANDOLF KRIECK",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-05-25 08:52:50",
+                dataAgendamento: "2025-06-06 10:30",
+                procedimento: "CONSULTA EM PEDIATRIA",
+                unidadeSolicitante: "UBS IRINEU KIENEN",
+                paciente: "BIANCA MARIA ROSSI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-06-07 16:16:06",
+                dataAgendamento: "2025-05-22 17:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA BERTOLINA MAY KECHELE II",
+                paciente: "PRISCILA MONTIBELLER",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-06-17 16:26:18",
+                dataAgendamento: "2025-06-06 11:30",
+                procedimento: "CONSULTA EM PEDIATRIA",
+                unidadeSolicitante: "UBS IRINEU KIENEN",
+                paciente: "LETICIA REITER",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-08-04 12:12:39",
+                dataAgendamento: "2025-07-09 08:15",
+                procedimento: "CONSULTA EM PROCTOLOGIA - GERAL",
+                unidadeSolicitante: "INDAIAL",
+                paciente: "MARISA GARLINI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-01 09:10:46",
+                dataAgendamento: "2025-05-26 14:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "KAIO BONETTE",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-01 14:35:27",
+                dataAgendamento: "2025-05-26 15:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "MARCOS DOS SANTOS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-02 08:29:55",
+                dataAgendamento: "2025-05-26 16:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS REMO WENDORF",
+                paciente: "DIOLINA SOUZA BISPO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-08 09:03:33",
+                dataAgendamento: "2025-05-26 17:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "ESTRATEGIA DE SAUDE DA FAMILIA BERTOLINA MAY KECHELE II",
+                paciente: "MOACIR RODRIGUES DE OLIVEIRA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-09 10:39:41",
+                dataAgendamento: "2025-06-09 14:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS MARCIA MARIA ANDREATTA",
+                paciente: "IVONETE APARECIDA MORAIS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-10 08:51:08",
+                dataAgendamento: "2025-06-09 15:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "BRYAN VASCO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-10 16:52:52",
+                dataAgendamento: "2025-06-09 16:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ADELE KUEHL",
+                paciente: "PAMELA RIBEIRO",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-13 13:34:07",
+                dataAgendamento: "2025-06-10 08:30",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS RENATO FERREIRA DE MELLO",
+                paciente: "SOLANGE APARECIDA DA SILVA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-13 14:49:43",
+                dataAgendamento: "2025-05-29 11:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS RENATO FERREIRA DE MELLO",
+                paciente: "TERESINHA DUARTE",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-15 09:52:13",
+                dataAgendamento: "2025-06-10 12:00",
+                procedimento: "CONSULTA EM OTORRINOLARINGOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "ADEMAR ANDRE RADLOFF",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-09-24 13:51:44",
+                dataAgendamento: "2025-05-29 11:30",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "IVONE RAMOS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-10-13 09:21:49",
+                dataAgendamento: "2025-06-13 09:35",
+                procedimento: "CONSULTA EM NEUROLOGIA - ADULTO",
+                unidadeSolicitante: "UBS RENATO FERREIRA DE MELLO",
+                paciente: "MICHELLE KARPOVICZ",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-10-15 16:27:28",
+                dataAgendamento: "2025-06-05 08:00",
+                procedimento: "CONSULTA EM OFTALMOLOGIA ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "ELISA AGOSTINI",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-10-20 14:22:55",
+                dataAgendamento: "2025-06-05 09:00",
+                procedimento: "CONSULTA EM OFTALMOLOGIA ADULTO",
+                unidadeSolicitante: "UBS ALBERT SABIN",
+                paciente: "AIRTON ALVES RODRIGUES",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-11-12 12:27:19",
+                dataAgendamento: "2025-05-30 09:25",
+                procedimento: "CONSULTA EM NEUROLOGIA - ADULTO",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "IVO GOLL",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-02 11:01:54",
+                dataAgendamento: "2025-07-11 08:00",
+                procedimento: "CONSULTA EM NEFROLOGIA - GERAL",
+                unidadeSolicitante: "UBS ADELE KUEHL",
+                paciente: "MARLI PACKER",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-09 13:45:27",
+                dataAgendamento: "2025-06-05 07:00",
+                procedimento: "CONSULTA EM OFTALMOLOGIA ADULTO",
+                unidadeSolicitante: "UBS DR JOAO JOSE CANDIDO DA SILVA",
+                paciente: "ROMILDA MARGOTI DE LIMA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-09 14:28:33",
+                dataAgendamento: "2025-08-04 15:45",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS DR JOAO JOSE CANDIDO DA SILVA",
+                paciente: "MARCO ANTONIO SILVA GARCIA",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-12-09 16:26:00",
+                dataAgendamento: "2025-06-12 08:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "JOAO VITOR DALVAN ALVES NAUTA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-16 08:26:30",
+                dataAgendamento: "2025-08-04 16:00",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "ALECIO FERNANDES PEREIRA",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2021-12-16 10:56:46",
+                dataAgendamento: "2025-06-12 12:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS ALBERT SABIN",
+                paciente: "DANIEL HENRIQUE ILARIO DE SOUZA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-17 13:56:56",
+                dataAgendamento: "2025-06-12 13:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "KAIO BONETTE",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2021-12-17 15:30:53",
+                dataAgendamento: "2025-06-12 13:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS NILO DE FREITAS",
+                paciente: "NICOLAS GABRIEL DE OLIVEIRA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-01-04 15:49:39",
+                dataAgendamento: "2025-05-16 10:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "RENAN EMANUEL PEREIRA DOS SANTOS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-01-18 13:14:13",
+                dataAgendamento: "2025-05-16 10:30",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "KALELL SCHAEDLER MOURA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-01-18 13:20:02",
+                dataAgendamento: "2025-05-16 11:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "ISAAC SAMUEL DOS SANTOS SILVA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-01-18 17:54:11",
+                dataAgendamento: "2025-05-16 11:30",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "SAIS SERVICO DE ATENDIMENTO INTEGRAL A SAUDE",
+                paciente: "AXEL DE MATTOS DA ROSA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-01-31 16:42:20",
+                dataAgendamento: "2025-05-16 13:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS DR JOAO JOSE CANDIDO DA SILVA",
+                paciente: "GABRIEL DE JESUS",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-02-01 15:07:41",
+                dataAgendamento: "2025-05-16 13:30",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "GUSTAVO NOGUEIRA DA SILVA",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-02-02 10:40:49",
+                dataAgendamento: "2025-08-04 16:30",
+                procedimento: "CONSULTA EM CARDIOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ARTUR KEUNECKE",
+                paciente: "PEDRO DE SOUZA E SILVA",
+                status: "Agendado"
+            },
+            {
+                dataSolicitacao: "2022-02-02 11:24:06",
+                dataAgendamento: "2025-06-26 13:00",
+                procedimento: "CONSULTA EM ENDOCRINOLOGIA - ADULTO",
+                unidadeSolicitante: "UBS ADRIANA JUCELI CATTONI",
+                paciente: "MARIA SALETE PATZER DO AMARAL",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-02-02 13:27:45",
+                dataAgendamento: "2025-05-16 14:30",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS DR JOAO JOSE CANDIDO DA SILVA",
+                paciente: "JOAO MIGUEL GONCALVES",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-02-04 13:49:55",
+                dataAgendamento: "2025-05-16 15:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS MARCIA MARIA ANDREATTA",
+                paciente: "MATHEUS DA SILVA SEBOLD",
+                status: "Realizado"
+            },
+            {
+                dataSolicitacao: "2022-02-08 16:16:45",
+                dataAgendamento: "2025-05-16 16:00",
+                procedimento: "CONSULTA EM NEUROLOGIA - PEDIATRIA",
+                unidadeSolicitante: "UBS RENATO FERREIRA DE MELLO",
+                paciente: "NICOLAS HENRIQUE DA SILVA DE BARBA",
+                status: "Realizado"
+            }
+        ];
+
+        // Função para popular a tabela
+        function populateTable(dataToShow) {
+            const tableBody = document.querySelector('#dataTable tbody');
+            tableBody.innerHTML = '';
+            
+            dataToShow.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Formatar data de solicitação
+                const dataSolicitacao = new Date(item.dataSolicitacao);
+                const dataSolicitacaoFormatada = dataSolicitacao.toLocaleDateString('pt-BR') + ' ' + 
+                                                dataSolicitacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                
+                // Formatar data de agendamento
+                const dataAgendamento = new Date(item.dataAgendamento);
+                const dataAgendamentoFormatada = dataAgendamento.toLocaleDateString('pt-BR');
+                
+                // Determinar classe do status
+                let statusClass = '';
+                if (item.status === 'Realizado') {
+                    statusClass = 'status-realizado';
+                } else if (item.status === 'Agendado') {
+                    statusClass = 'status-agendado';
+                } else if (item.status === 'Pendente') {
+                    statusClass = 'status-pendente';
+                } else if (item.status === 'Cancelado') {
+                    statusClass = 'status-cancelado';
+                }
+                
+                row.innerHTML = `
+                    <td>${dataSolicitacaoFormatada}</td>
+                    <td>${item.procedimento}</td>
+                    <td>${item.unidadeSolicitante}</td>
+                    <td>${dataAgendamentoFormatada}</td>
+                    <td>${item.paciente}</td>
+                    <td><span class="status-badge ${statusClass}">${item.status}</span></td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Função para calcular métricas
+        function calculateMetrics(dataToShow) {
+            const totalAgendamentos = dataToShow.length;
+            const procedimentosRealizados = dataToShow.filter(item => item.status === 'Realizado').length;
+            const procedimentosCancelados = dataToShow.filter(item => item.status === 'Cancelado').length;
+            
+            // Calcular tempo médio de espera (em dias)
+            let totalDiasEspera = 0;
+            let countComDataAgendamento = 0;
+            
+            dataToShow.forEach(item => {
+                if (item.dataAgendamento && item.dataSolicitacao) {
+                    const dataSolicitacao = new Date(item.dataSolicitacao);
+                    const dataAgendamento = new Date(item.dataAgendamento);
+                    const diffTime = Math.abs(dataAgendamento - dataSolicitacao);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    totalDiasEspera += diffDays;
+                    countComDataAgendamento++;
+                }
+            });
+            
+            const tempoMedioEspera = countComDataAgendamento > 0 ? Math.round(totalDiasEspera / countComDataAgendamento) : 0;
+            
+            // Atualizar os cards de métricas
+            document.getElementById('totalAgendamentos').textContent = totalAgendamentos;
+            document.getElementById('tempoMedioEspera').textContent = tempoMedioEspera;
+            document.getElementById('procedimentosRealizados').textContent = procedimentosRealizados;
+            document.getElementById('procedimentosCancelados').textContent = procedimentosCancelados;
+        }
+
+        // Função para preparar dados para o gráfico de barras
+        function prepareBarChartData(dataToShow) {
+            const procedureCounts = {};
+            
+            dataToShow.forEach(item => {
+                if (procedureCounts[item.procedimento]) {
+                    procedureCounts[item.procedimento]++;
+                } else {
+                    procedureCounts[item.procedimento] = 1;
+                }
+            });
+            
+            const labels = Object.keys(procedureCounts);
+            const counts = Object.values(procedureCounts);
+            
+            return { labels, counts };
+        }
+
+        // Função para preparar dados para o gráfico de pizza
+        function preparePieChartData(dataToShow) {
+            const procedureCounts = {};
+            
+            dataToShow.forEach(item => {
+                if (procedureCounts[item.procedimento]) {
+                    procedureCounts[item.procedimento]++;
+                } else {
+                    procedureCounts[item.procedimento] = 1;
+                }
+            });
+            
+            // Agrupar procedimentos com menos de 3 ocorrências em "Outros"
+            const aggregatedCounts = {};
+            let outrosCount = 0;
+            
+            Object.keys(procedureCounts).forEach(procedure => {
+                if (procedureCounts[procedure] >= 3) {
+                    aggregatedCounts[procedure] = procedureCounts[procedure];
+                } else {
+                    outrosCount += procedureCounts[procedure];
+                }
+            });
+            
+            if (outrosCount > 0) {
+                aggregatedCounts['Outros'] = outrosCount;
+            }
+            
+            const labels = Object.keys(aggregatedCounts);
+            const counts = Object.values(aggregatedCounts);
+            
+            return { labels, counts };
+        }
+
+        // Função para preparar dados para o gráfico de linha
+        function prepareLineChartData(dataToShow) {
+            const monthlyCounts = {};
+            
+            dataToShow.forEach(item => {
+                const date = new Date(item.dataSolicitacao);
+                const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
+                
+                if (monthlyCounts[monthYear]) {
+                    monthlyCounts[monthYear]++;
+                } else {
+                    monthlyCounts[monthYear] = 1;
+                }
+            });
+            
+            // Ordenar por mês/ano
+            const sortedMonths = Object.keys(monthlyCounts).sort((a, b) => {
+                const [monthA, yearA] = a.split('/').map(Number);
+                const [monthB, yearB] = b.split('/').map(Number);
+                
+                if (yearA !== yearB) {
+                    return yearA - yearB;
+                }
+                
+                return monthA - monthB;
+            });
+            
+            const labels = sortedMonths;
+            const counts = sortedMonths.map(month => monthlyCounts[month]);
+            
+            return { labels, counts };
+        }
+
+        // Função para inicializar os gráficos
+        function initCharts() {
+            // Gráfico de barras
+            const barCtx = document.getElementById('proceduresBarChart').getContext('2d');
+            const barData = prepareBarChartData(data);
+            
+            window.barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: barData.labels,
+                    datasets: [{
+                        label: 'Quantidade de Procedimentos',
+                        data: barData.counts,
+                        backgroundColor: 'rgba(74, 107, 223, 0.7)',
+                        borderColor: 'rgba(74, 107, 223, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#b0b0b0'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#b0b0b0',
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de pizza
+            const pieCtx = document.getElementById('proceduresPieChart').getContext('2d');
+            const pieData = preparePieChartData(data);
+            
+            window.pieChart = new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: pieData.labels,
+                    datasets: [{
+                        data: pieData.counts,
+                        backgroundColor: [
+                            'rgba(74, 107, 223, 0.7)',
+                            'rgba(76, 175, 80, 0.7)',
+                            'rgba(255, 152, 0, 0.7)',
+                            'rgba(244, 67, 54, 0.7)',
+                            'rgba(156, 39, 176, 0.7)',
+                            'rgba(0, 188, 212, 0.7)',
+                            'rgba(255, 235, 59, 0.7)',
+                            'rgba(96, 125, 139, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(74, 107, 223, 1)',
+                            'rgba(76, 175, 80, 1)',
+                            'rgba(255, 152, 0, 1)',
+                            'rgba(244, 67, 54, 1)',
+                            'rgba(156, 39, 176, 1)',
+                            'rgba(0, 188, 212, 1)',
+                            'rgba(255, 235, 59, 1)',
+                            'rgba(96, 125, 139, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#ffffff',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de linha
+            const lineCtx = document.getElementById('evolutionLineChart').getContext('2d');
+            const lineData = prepareLineChartData(data);
+            
+            window.lineChart = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineData.labels,
+                    datasets: [{
+                        label: 'Evolução da Fila',
+                        data: lineData.counts,
+                        backgroundColor: 'rgba(74, 107, 223, 0.2)',
+                        borderColor: 'rgba(74, 107, 223, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#b0b0b0'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#b0b0b0'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Função para atualizar os gráficos com base nos filtros
+        function updateCharts(dataToShow) {
+            // Atualizar gráfico de barras
+            const barData = prepareBarChartData(dataToShow);
+            window.barChart.data.labels = barData.labels;
+            window.barChart.data.datasets[0].data = barData.counts;
+            window.barChart.update();
+            
+            // Atualizar gráfico de pizza
+            const pieData = preparePieChartData(dataToShow);
+            window.pieChart.data.labels = pieData.labels;
+            window.pieChart.data.datasets[0].data = pieData.counts;
+            window.pieChart.update();
+            
+            // Atualizar gráfico de linha
+            const lineData = prepareLineChartData(dataToShow);
+            window.lineChart.data.labels = lineData.labels;
+            window.lineChart.data.datasets[0].data = lineData.counts;
+            window.lineChart.update();
+        }
+
+        // Função para popular o filtro de procedimentos
+        function populateProcedureFilter() {
+            const procedureFilter = document.getElementById('procedureFilter');
+            const procedures = [...new Set(data.map(item => item.procedimento))];
+            
+            procedures.forEach(procedure => {
+                const option = document.createElement('option');
+                option.value = procedure;
+                option.textContent = procedure;
+                procedureFilter.appendChild(option);
+            });
+        }
+
+        // Função para aplicar filtros
+        function applyFilters() {
+            const monthFilter = document.getElementById('monthFilter').value;
+            const procedureFilter = document.getElementById('procedureFilter').value;
+            
+            let filteredData = data;
+            
+            // Aplicar filtro de mês
+            if (monthFilter !== 'all') {
+                filteredData = filteredData.filter(item => {
+                    const date = new Date(item.dataSolicitacao);
+                    return (date.getMonth() + 1).toString().padStart(2, '0') === monthFilter;
+                });
+            }
+            
+            // Aplicar filtro de procedimento
+            if (procedureFilter !== 'all') {
+                filteredData = filteredData.filter(item => item.procedimento === procedureFilter);
+            }
+            
+            // Atualizar tabela, métricas e gráficos
+            populateTable(filteredData);
+            calculateMetrics(filteredData);
+            updateCharts(filteredData);
+        }
+
+        // Função para exportar dados
+        function exportData() {
+            const monthFilter = document.getElementById('monthFilter').value;
+            const procedureFilter = document.getElementById('procedureFilter').value;
+            
+            let filteredData = data;
+            
+            // Aplicar filtro de mês
+            if (monthFilter !== 'all') {
+                filteredData = filteredData.filter(item => {
+                    const date = new Date(item.dataSolicitacao);
+                    return (date.getMonth() + 1).toString().padStart(2, '0') === monthFilter;
+                });
+            }
+            
+            // Aplicar filtro de procedimento
+            if (procedureFilter !== 'all') {
+                filteredData = filteredData.filter(item => item.procedimento === procedureFilter);
+            }
+            
+            // Criar CSV
+            let csv = 'Data da Solicitação,Procedimento,Unidade Solicitante,Data Agendamento,Paciente,Status\n';
+            
+            filteredData.forEach(item => {
+                const dataSolicitacao = new Date(item.dataSolicitacao);
+                const dataSolicitacaoFormatada = dataSolicitacao.toLocaleDateString('pt-BR') + ' ' + 
+                                                dataSolicitacao.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                
+                const dataAgendamento = new Date(item.dataAgendamento);
+                const dataAgendamentoFormatada = dataAgendamento.toLocaleDateString('pt-BR');
+                
+                csv += `"${dataSolicitacaoFormatada}","${item.procedimento}","${item.unidadeSolicitante}","${dataAgendamentoFormatada}","${item.paciente}","${item.status}"\n`;
+            });
+            
+            // Criar blob e download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'fila_de_espera.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Inicialização quando o DOM estiver carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Popular tabela inicial
+            populateTable(data);
+            
+            // Calcular métricas iniciais
+            calculateMetrics(data);
+            
+            // Inicializar gráficos
+            initCharts();
+            
+            // Popular filtro de procedimentos
+            populateProcedureFilter();
+            
+            // Adicionar event listeners
+            document.getElementById('applyFilters').addEventListener('click', applyFilters);
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+        });
+    </script>
+</body>
+</html>
